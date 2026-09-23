@@ -1,0 +1,413 @@
+-- =====================================================================
+-- SOLUTIONS — BrightCart SQL Practice Project
+-- Written in Postgres-flavored SQL. MySQL alternatives noted where the
+-- syntax diverges meaningfully.
+-- =====================================================================
+
+-- ============================ SECTION 1 ============================
+
+-- 1.1
+SELECT * FROM customers WHERE country = 'Kenya';
+
+-- 1.2
+SELECT * FROM products WHERE unit_price > 50;
+
+-- 1.3
+SELECT * FROM orders WHERE status <> 'Completed';
+
+-- 1.4
+SELECT * FROM products WHERE stock_qty BETWEEN 50 AND 150;
+
+-- 1.5
+SELECT * FROM customers WHERE loyalty_tier IS NULL;
+
+-- 1.6
+SELECT * FROM orders WHERE order_date >= '2023-03-01' AND order_date < '2023-04-01';
+
+-- ============================ SECTION 2 ============================
+
+-- 2.1
+SELECT * FROM products WHERE category = 'Electronics' AND unit_price < 30;
+
+-- 2.2
+SELECT * FROM customers WHERE country = 'Kenya' OR loyalty_tier = 'Gold';
+
+-- 2.3
+SELECT * FROM orders WHERE status IN ('Cancelled', 'Returned');
+
+-- 2.4
+SELECT * FROM products WHERE product_name LIKE '%Desk%';
+
+-- 2.5
+SELECT * FROM customers
+WHERE LOWER(full_name) LIKE 'a%' OR LOWER(full_name) LIKE 'e%'
+   OR LOWER(full_name) LIKE 'i%' OR LOWER(full_name) LIKE 'o%'
+   OR LOWER(full_name) LIKE 'u%';
+
+-- 2.6
+SELECT * FROM employees
+WHERE (department = 'IT' AND salary > 70000)
+   OR (department = 'Sales' AND salary > 90000);
+
+-- ============================ SECTION 3 ============================
+
+-- 3.1
+SELECT product_name, ROUND(unit_price) AS rounded_price FROM products;
+
+-- 3.2
+SELECT order_item_id, order_id, quantity * unit_price AS line_total FROM order_items;
+
+-- 3.3
+SELECT product_name, unit_price, ROUND(unit_price * 0.85, 2) AS discounted_price FROM products;
+
+-- 3.4
+SELECT product_name, unit_price, ABS(unit_price - 50) AS diff_from_50 FROM products;
+
+-- 3.5  (Postgres: use FLOOR(quantity / 2.0) or quantity/2 with integer types truncates already)
+SELECT order_item_id, quantity,
+       quantity / 2 AS integer_division,      -- integer/integer truncates in most engines
+       quantity / 2.0 AS true_division
+FROM order_items;
+
+-- 3.6
+SELECT product_name, unit_price, SQRT(unit_price) AS sqrt_price FROM products;
+
+-- ============================ SECTION 4 ============================
+
+-- 4.1
+SELECT country, COUNT(*) AS customer_count
+FROM customers
+GROUP BY country
+ORDER BY customer_count DESC;
+
+-- 4.2
+SELECT order_id, SUM(quantity * unit_price) AS order_total
+FROM order_items
+GROUP BY order_id
+ORDER BY order_id;
+
+-- 4.3
+SELECT category, ROUND(AVG(unit_price), 2) AS avg_price
+FROM products
+GROUP BY category;
+
+-- 4.4
+SELECT product_id, SUM(quantity) AS total_qty_sold
+FROM order_items
+GROUP BY product_id
+ORDER BY total_qty_sold DESC;
+
+-- 4.5
+SELECT category, COUNT(*) AS product_count
+FROM products
+GROUP BY category
+HAVING COUNT(*) > 4;
+
+-- 4.6
+SELECT customer_id, COUNT(*) AS order_count
+FROM orders
+GROUP BY customer_id
+HAVING COUNT(*) > 2;
+
+-- 4.7
+SELECT department, MIN(salary) AS min_salary, MAX(salary) AS max_salary, ROUND(AVG(salary),2) AS avg_salary
+FROM employees
+GROUP BY department;
+
+-- 4.8
+SELECT o.customer_id, SUM(oi.quantity * oi.unit_price) AS total_revenue
+FROM orders o
+JOIN order_items oi ON oi.order_id = o.order_id
+WHERE o.status = 'Completed'
+GROUP BY o.customer_id
+ORDER BY total_revenue DESC;
+
+-- ============================ SECTION 5 ============================
+
+-- 5.1
+SELECT product_name, unit_price FROM products
+ORDER BY unit_price DESC
+LIMIT 5;
+
+-- 5.2
+SELECT customer_id, COUNT(*) AS order_count
+FROM orders
+GROUP BY customer_id
+ORDER BY order_count DESC
+LIMIT 3;
+
+-- 5.3
+SELECT product_id, SUM(quantity) AS total_qty
+FROM order_items
+GROUP BY product_id
+ORDER BY total_qty DESC
+LIMIT 3;
+
+-- 5.4 (correlated subquery version)
+SELECT o1.*
+FROM orders o1
+WHERE o1.order_date = (
+    SELECT MAX(o2.order_date) FROM orders o2 WHERE o2.customer_id = o1.customer_id
+);
+
+-- 5.5 (2nd highest salary without LIMIT/OFFSET)
+SELECT MAX(salary) AS second_highest_salary
+FROM employees
+WHERE salary < (SELECT MAX(salary) FROM employees);
+
+-- 5.6 (top-selling product per category)
+SELECT category, product_name, total_qty
+FROM (
+    SELECT p.category, p.product_name, SUM(oi.quantity) AS total_qty,
+           RANK() OVER (PARTITION BY p.category ORDER BY SUM(oi.quantity) DESC) AS rnk
+    FROM products p
+    JOIN order_items oi ON oi.product_id = p.product_id
+    GROUP BY p.category, p.product_name
+) ranked
+WHERE rnk = 1;
+
+-- ============================ SECTION 6 ============================
+
+-- 6.1
+SELECT full_name, UPPER(full_name) AS name_upper FROM customers;
+
+-- 6.2  (Postgres: SPLIT_PART; MySQL: SUBSTRING_INDEX(email, '@', -1))
+SELECT email, SPLIT_PART(email, '@', 2) AS domain FROM customers;
+-- MySQL version:
+-- SELECT email, SUBSTRING_INDEX(email, '@', -1) AS domain FROM customers;
+
+-- 6.3
+SELECT full_name, country, full_name || ' (' || country || ')' AS display_name
+FROM customers;
+-- MySQL version: CONCAT(full_name, ' (', country, ')')
+
+-- 6.4
+SELECT product_name, LENGTH(product_name) AS name_length FROM products;
+
+-- 6.5  (Postgres: SPLIT_PART; MySQL: SUBSTRING_INDEX)
+SELECT full_name, SPLIT_PART(full_name, ' ', 1) AS first_name FROM employees;
+-- MySQL version:
+-- SELECT full_name, SUBSTRING_INDEX(full_name, ' ', 1) AS first_name FROM employees;
+
+-- 6.6
+SELECT product_name, REPLACE(product_name, ' ', '_') AS underscored_name FROM products;
+
+-- 6.7
+SELECT product_name FROM products
+WHERE (LOWER(product_name) LIKE 'a%' OR LOWER(product_name) LIKE 'e%'
+    OR LOWER(product_name) LIKE 'i%' OR LOWER(product_name) LIKE 'o%'
+    OR LOWER(product_name) LIKE 'u%')
+  AND LENGTH(product_name) > 10;
+
+-- 6.8  (Postgres has INITCAP; MySQL doesn't — approximate with CONCAT/UPPER/LOWER)
+SELECT full_name, INITCAP(TRIM(full_name)) AS clean_name FROM customers;
+-- MySQL has no built-in INITCAP; typically handled in application code or a UDF.
+
+-- ============================ SECTION 7 ============================
+
+-- 7.1
+SELECT order_id, order_item_id, quantity * unit_price AS line_total,
+       SUM(quantity * unit_price) OVER (
+           PARTITION BY order_id ORDER BY order_item_id
+           ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+       ) AS running_total
+FROM order_items
+ORDER BY order_id, order_item_id;
+
+-- 7.2
+SELECT customer_id, total_spend,
+       RANK() OVER (ORDER BY total_spend DESC) AS spend_rank
+FROM (
+    SELECT o.customer_id, SUM(oi.quantity * oi.unit_price) AS total_spend
+    FROM orders o
+    JOIN order_items oi ON oi.order_id = o.order_id
+    WHERE o.status = 'Completed'
+    GROUP BY o.customer_id
+) t;
+
+-- 7.3
+SELECT product_name, category, unit_price,
+       ROUND(AVG(unit_price) OVER (PARTITION BY category), 2) AS category_avg_price
+FROM products;
+
+-- 7.4
+SELECT customer_id, order_id, order_date,
+       LAG(order_date) OVER (PARTITION BY customer_id ORDER BY order_date) AS previous_order_date
+FROM orders
+ORDER BY customer_id, order_date;
+
+-- 7.5
+SELECT * FROM (
+    SELECT o.*,
+           ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY order_date DESC) AS rn
+    FROM orders o
+) t
+WHERE rn = 1;
+
+-- 7.6
+SELECT full_name, department, salary,
+       ROUND(salary - AVG(salary) OVER (PARTITION BY department), 2) AS diff_from_dept_avg
+FROM employees;
+
+-- 7.7
+SELECT product_name, unit_price,
+       NTILE(4) OVER (ORDER BY unit_price) AS price_quartile
+FROM products;
+
+-- ============================ SECTION 8 ============================
+
+-- 8.1  (Postgres: TO_CHAR; MySQL: DAYNAME)
+SELECT order_id, order_date, TO_CHAR(order_date, 'Day') AS day_of_week FROM orders;
+-- MySQL version:
+-- SELECT order_id, order_date, DAYNAME(order_date) AS day_of_week FROM orders;
+
+-- 8.2
+SELECT * FROM orders
+WHERE order_date >= (SELECT MAX(order_date) FROM orders) - INTERVAL '90 days';
+-- MySQL version:
+-- WHERE order_date >= (SELECT MAX(order_date) FROM orders) - INTERVAL 90 DAY;
+
+-- 8.3
+SELECT customer_id, signup_date,
+       CURRENT_DATE - signup_date AS days_since_signup
+FROM customers;
+-- MySQL version: DATEDIFF(CURDATE(), signup_date)
+
+-- 8.4  (Postgres: TO_CHAR; MySQL: DATE_FORMAT)
+SELECT TO_CHAR(order_date, 'YYYY-MM') AS order_month, COUNT(*) AS order_count
+FROM orders
+GROUP BY TO_CHAR(order_date, 'YYYY-MM')
+ORDER BY order_month;
+-- MySQL version:
+-- SELECT DATE_FORMAT(order_date, '%Y-%m') AS order_month, COUNT(*) ...
+
+-- 8.5
+SELECT full_name, hire_date,
+       AGE(CURRENT_DATE, hire_date) AS tenure
+FROM employees
+WHERE hire_date <= CURRENT_DATE - INTERVAL '5 years';
+-- MySQL version: WHERE hire_date <= CURDATE() - INTERVAL 5 YEAR;
+
+-- 8.6
+SELECT c.customer_id, c.signup_date, MIN(o.order_date) AS first_order_date,
+       MIN(o.order_date) - c.signup_date AS days_to_first_order
+FROM customers c
+JOIN orders o ON o.customer_id = c.customer_id
+GROUP BY c.customer_id, c.signup_date;
+
+-- ============================ SECTION 9 ============================
+
+-- 9.1
+SELECT product_name, unit_price,
+    CASE
+        WHEN unit_price < 20 THEN 'Budget'
+        WHEN unit_price BETWEEN 20 AND 100 THEN 'Mid-range'
+        ELSE 'Premium'
+    END AS price_tier
+FROM products;
+
+-- 9.2
+SELECT customer_id, full_name, COALESCE(loyalty_tier, 'Not Enrolled') AS loyalty_tier
+FROM customers;
+
+-- 9.3
+SELECT order_id, order_date,
+    CASE WHEN order_date > '2023-05-01' THEN 'Recent' ELSE 'Older' END AS recency
+FROM orders;
+
+-- 9.4
+SELECT e.full_name AS employee, COALESCE(m.full_name, 'No Manager') AS manager
+FROM employees e
+LEFT JOIN employees m ON e.manager_id = m.employee_id;
+
+-- 9.5
+SELECT category,
+       SUM(CASE WHEN unit_price < 20 THEN 1 ELSE 0 END) AS budget_count,
+       SUM(CASE WHEN unit_price BETWEEN 20 AND 100 THEN 1 ELSE 0 END) AS midrange_count,
+       SUM(CASE WHEN unit_price > 100 THEN 1 ELSE 0 END) AS premium_count
+FROM products
+GROUP BY category;
+
+-- 9.6
+SELECT value_bucket, COUNT(*) AS order_count
+FROM (
+    SELECT o.order_id,
+        CASE
+            WHEN SUM(oi.quantity * oi.unit_price) > 200 THEN 'High Value'
+            WHEN SUM(oi.quantity * oi.unit_price) BETWEEN 50 AND 200 THEN 'Medium'
+            ELSE 'Low'
+        END AS value_bucket
+    FROM orders o
+    JOIN order_items oi ON oi.order_id = o.order_id
+    GROUP BY o.order_id
+) t
+GROUP BY value_bucket;
+
+-- ============================ SECTION 10 ============================
+
+-- 10.1
+SELECT country, total_revenue,
+       RANK() OVER (ORDER BY total_revenue DESC) AS revenue_rank
+FROM (
+    SELECT c.country, SUM(oi.quantity * oi.unit_price) AS total_revenue
+    FROM customers c
+    JOIN orders o ON o.customer_id = c.customer_id
+    JOIN order_items oi ON oi.order_id = o.order_id
+    WHERE o.status = 'Completed'
+    GROUP BY c.country
+) t;
+
+-- 10.2
+SELECT customer_id, category, total_qty FROM (
+    SELECT c.customer_id, p.category, SUM(oi.quantity) AS total_qty,
+           ROW_NUMBER() OVER (PARTITION BY c.customer_id ORDER BY SUM(oi.quantity) DESC) AS rn
+    FROM customers c
+    JOIN orders o ON o.customer_id = c.customer_id
+    JOIN order_items oi ON oi.order_id = o.order_id
+    JOIN products p ON p.product_id = oi.product_id
+    GROUP BY c.customer_id, p.category
+) t
+WHERE rn = 1;
+
+-- 10.3
+SELECT order_month, monthly_revenue,
+       monthly_revenue - LAG(monthly_revenue) OVER (ORDER BY order_month) AS mom_growth
+FROM (
+    SELECT TO_CHAR(o.order_date, 'YYYY-MM') AS order_month,
+           SUM(oi.quantity * oi.unit_price) AS monthly_revenue
+    FROM orders o
+    JOIN order_items oi ON oi.order_id = o.order_id
+    GROUP BY TO_CHAR(o.order_date, 'YYYY-MM')
+) t
+ORDER BY order_month;
+
+-- 10.4
+SELECT c.customer_id, c.full_name
+FROM customers c
+WHERE NOT EXISTS (
+    SELECT 1 FROM orders o
+    WHERE o.customer_id = c.customer_id AND o.status = 'Completed'
+);
+
+-- 10.5
+SELECT m.full_name AS manager, m.department,
+       COUNT(e.employee_id) AS direct_reports,
+       ROUND(AVG(e.salary), 2) AS avg_report_salary
+FROM employees m
+JOIN employees e ON e.manager_id = m.employee_id
+GROUP BY m.full_name, m.department;
+
+-- 10.6
+SELECT order_month, product_name, product_revenue FROM (
+    SELECT TO_CHAR(o.order_date, 'YYYY-MM') AS order_month,
+           p.product_name,
+           SUM(oi.quantity * oi.unit_price) AS product_revenue,
+           RANK() OVER (PARTITION BY TO_CHAR(o.order_date, 'YYYY-MM')
+                        ORDER BY SUM(oi.quantity * oi.unit_price) DESC) AS rnk
+    FROM orders o
+    JOIN order_items oi ON oi.order_id = o.order_id
+    JOIN products p ON p.product_id = oi.product_id
+    GROUP BY TO_CHAR(o.order_date, 'YYYY-MM'), p.product_name
+) t
+WHERE rnk = 1
+ORDER BY order_month;
