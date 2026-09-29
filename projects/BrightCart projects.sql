@@ -330,3 +330,33 @@ GROUP BY customer_id
 ORDER BY order_count DESC
 LIMIT 3;
 
+#5.3 Find the top 3 best-selling products by total quantity sold.
+select
+	product_name,
+	sum(order_items.quantity)
+from
+	kenya.order_items
+join
+	products
+on
+	order_items.product_id=products.product_id
+group by
+	product_name
+order by	
+	sum(order_items.quantity) desc
+limit 3;
+
+#5.4 Find the single most recent order for each customer (1 row per customer) — try this two ways: with a correlated subquery, and (after Section 7) with a window function.
+select
+	distinct customer_id,
+    max(order_date)
+from orders
+group by customer_id;
+
+select
+    customer_id,
+    order_date
+from
+	orders
+where
+	order_date=max(order_date)
